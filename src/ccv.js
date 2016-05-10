@@ -32,7 +32,7 @@ if (parallable === undefined) {
 		"use strict";
 
 		parallable.core[funct.toString()] = funct().core;
-		
+
 		return function () {
 			var i;
 			var async, worker_num, params;
@@ -491,3 +491,5 @@ onmessage = function (event) {
 		postMessage(JSON.stringify(result));
 	}
 }
+
+module.exports = ccv

@@ -5,119 +5,126 @@ Copyright (c) 2014 Jay Salvat
 
 /* global $:true, ccv:true, cascade:true */
 
-$.fn.faceDetection = function (settingsOrCallback) {
-    "use strict";
+var cascade = require('./cascade.js')
+var ccv = require('./ccv.js')
 
-    var time;
+module.exports = function ($) {
 
-    var options = {
-        interval:     4,
-        minNeighbors: 1,
-        grayscale:    true,
-        confidence:   null,
-        async:        false,
-        complete:     function () {}, // (faces)
-        error:        function () {}  // (code, message)
-    };
+  $.fn.faceDetection = function (settingsOrCallback) {
+      "use strict";
 
-    if ($.isFunction(settingsOrCallback)) {
-        options.complete = settingsOrCallback;
-    } else {
-        $.extend(options, settingsOrCallback);
-    }
+      var time;
 
-    return this.each(function() {
-        var $$       = $(this),
-            offset   = $$.offset(),
-            position = $$.position(),
-            scaleX   = ($$.width()  / (this.naturalWidth  || this.videoWidth )) || 1,
-            scaleY   = ($$.height() / (this.naturalHeight || this.videoHeight)) || 1;
+      var options = {
+          interval:     4,
+          minNeighbors: 1,
+          grayscale:    true,
+          confidence:   null,
+          async:        false,
+          complete:     function () {}, // (faces)
+          error:        function () {}  // (code, message)
+      };
 
-        if (!$$.is('img, video, canvas')) {
-            options.error.apply($$, [ 1, 'Face detection is possible on images, videos and canvas only.' ]);
-            options.complete.apply($$, [ [] ]);
-            
-            return;
-        }
+      if ($.isFunction(settingsOrCallback)) {
+          options.complete = settingsOrCallback;
+      } else {
+          $.extend(options, settingsOrCallback);
+      }
 
-        function detect() {
-            var source, canvas;
-            
-            time = new Date().getTime();
+      return this.each(function() {
+          var $$       = $(this),
+              offset   = $$.offset(),
+              position = $$.position(),
+              scaleX   = ($$.width()  / (this.naturalWidth  || this.videoWidth )) || 1,
+              scaleY   = ($$.height() / (this.naturalHeight || this.videoHeight)) || 1;
 
-            if ($$.is('img')) {
-                source = new Image();
-                source.src = $$.attr('src');
-                source.crossOrigin = $$.attr('crossorigin');
+          if (!$$.is('img, video, canvas')) {
+              options.error.apply($$, [ 1, 'Face detection is possible on images, videos and canvas only.' ]);
+              options.complete.apply($$, [ [] ]);
 
-                canvas = ccv.pre(source);
-            } else if ($$.is('video') || $$.is('canvas')) {
-                var copy, context;
+              return;
+          }
 
-                source = $$[0];
-                
-                copy = document.createElement('canvas');
-                copy.setAttribute('width',  source.videoWidth  || source.width);
-                copy.setAttribute('height', source.videoHeight || source.height);
-                
-                context = copy.getContext("2d");
-                context.drawImage(source, 0, 0);
+          function detect() {
+              var source, canvas;
 
-                canvas = ccv.pre(copy);
-            } 
+              time = new Date().getTime();
 
-            if (options.grayscale) {
-                canvas = ccv.grayscale(canvas);
-            }
+              if ($$.is('img')) {
+                  source = new Image();
+                  source.src = $$.attr('src');
+                  source.crossOrigin = $$.attr('crossorigin');
 
-            try {
-                if (options.async && window.Worker) {
-                    ccv.detect_objects({
-                        "canvas":        canvas,
-                        "cascade":       cascade,
-                        "interval":      options.interval,
-                        "min_neighbors": options.minNeighbors,
-                        "worker":        1,
-                        "async":         true
-                    })(done);
-                } else {
-                    done(ccv.detect_objects({
-                        "canvas":        canvas,
-                        "cascade":       cascade,
-                        "interval":      options.interval,
-                        "min_neighbors": options.minNeighbors
-                    }));
-                }
-            } catch (e) {
-                options.error.apply($$, [ 2, e.message ]);
-                options.complete.apply($$, [ false ]);
-            }
-        }
+                  canvas = ccv.pre(source);
+              } else if ($$.is('video') || $$.is('canvas')) {
+                  var copy, context;
 
-        function done(faces) {
-            var n = faces.length,
-                data = [];
+                  source = $$[0];
 
-            for (var i = 0; i < n; ++i) {
-                if (options.confidence !== null && faces[i].confidence <= options.confidence) {
-                    continue;
-                }
+                  copy = document.createElement('canvas');
+                  copy.setAttribute('width',  source.videoWidth  || source.width);
+                  copy.setAttribute('height', source.videoHeight || source.height);
 
-                faces[i].positionX = position.left + faces[i].x;
-                faces[i].positionY = position.top  + faces[i].y;
-                faces[i].offsetX   = offset.left   + faces[i].x;
-                faces[i].offsetY   = offset.top    + faces[i].y;
-                faces[i].scaleX    = scaleX;
-                faces[i].scaleY    = scaleY;
+                  context = copy.getContext("2d");
+                  context.drawImage(source, 0, 0);
 
-                data.push(faces[i]);
-            }
+                  canvas = ccv.pre(copy);
+              }
 
-            data.time = new Date().getTime() - time;
+              if (options.grayscale) {
+                  canvas = ccv.grayscale(canvas);
+              }
 
-            options.complete.apply($$, [ data ]);
-        }
+              try {
+                  if (options.async && window.Worker) {
+                      ccv.detect_objects({
+                          "canvas":        canvas,
+                          "cascade":       cascade,
+                          "interval":      options.interval,
+                          "min_neighbors": options.minNeighbors,
+                          "worker":        1,
+                          "async":         true
+                      })(done);
+                  } else {
+                      done(ccv.detect_objects({
+                          "canvas":        canvas,
+                          "cascade":       cascade,
+                          "interval":      options.interval,
+                          "min_neighbors": options.minNeighbors
+                      }));
+                  }
+              } catch (e) {
+                  options.error.apply($$, [ 2, e.message ]);
+                  options.complete.apply($$, [ false ]);
+              }
+          }
 
-        return detect();
-    });
-};
+          function done(faces) {
+              var n = faces.length,
+                  data = [];
+
+              for (var i = 0; i < n; ++i) {
+                  if (options.confidence !== null && faces[i].confidence <= options.confidence) {
+                      continue;
+                  }
+
+                  faces[i].positionX = position.left + faces[i].x;
+                  faces[i].positionY = position.top  + faces[i].y;
+                  faces[i].offsetX   = offset.left   + faces[i].x;
+                  faces[i].offsetY   = offset.top    + faces[i].y;
+                  faces[i].scaleX    = scaleX;
+                  faces[i].scaleY    = scaleY;
+
+                  data.push(faces[i]);
+              }
+
+              data.time = new Date().getTime() - time;
+
+              options.complete.apply($$, [ data ]);
+          }
+
+          return detect();
+      });
+  };
+
+}
